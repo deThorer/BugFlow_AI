@@ -515,7 +515,12 @@ async function runTriage(issueNumber: number, ctx: ActionContext): Promise<void>
 	await swapLabel(ctx.repo, issueNumber, currentLabel, newLabel, ctx.writeToken);
 
 	// Apply priority + package labels if the issue was reproduced.
-	if (triageResult.reproducible) {
+	// Skipped when the repo has no priority labels ("- P1: ...", "- P2: ..."):
+	// the schema would be an empty picklist the model cannot satisfy, and the
+	// resulting error would mark an already-triaged issue as "failed".
+	if (triageResult.reproducible && priorityLabels.length === 0) {
+		console.info('No priority labels found in repo; skipping priority/package label selection.');
+	} else if (triageResult.reproducible) {
 		const selectedLabels = await selectTriageLabels(session, {
 			comment,
 			priorityLabels,
