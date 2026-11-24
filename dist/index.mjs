@@ -241598,7 +241598,9 @@ I've opened a pull request with this fix: ${openedPr.html_url}`;
   const newLabel = resolveTriageLabel(triageResult, ctx, previewRelease, Boolean(openedPr));
   console.info(`Swapping triage label from ${currentLabel ?? "(none)"} to ${newLabel}.`);
   await swapLabel(ctx.repo, issueNumber, currentLabel, newLabel, ctx.writeToken);
-  if (triageResult.reproducible) {
+  if (triageResult.reproducible && priorityLabels.length === 0) {
+    console.info("No priority labels found in repo; skipping priority/package label selection.");
+  } else if (triageResult.reproducible) {
     const selectedLabels = await selectTriageLabels(session, {
       comment,
       priorityLabels,

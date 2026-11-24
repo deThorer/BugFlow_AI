@@ -224,13 +224,43 @@ The action has two layers:
 
 The action invokes project skills via [Flue](https://github.com/anthropics/flue), an agent orchestration framework. The AI agent runs shell commands on the GitHub Actions runner to build, test, and debug the project.
 
+## Project Layout
+
+```
+src/
+  index.ts            # Entry point: reads inputs + event payload, routes, dispatches
+  router.ts           # Pure FSM router: (event, current label) -> action
+  labels.ts           # Label config, retriageable/terminal sets, current-label lookup
+  context.ts          # ActionContext type shared by all handlers
+  input.ts            # getInput(): reads INPUT_* env vars set by GitHub Actions
+  github.ts           # REST helpers (issues, labels, comments, PRs, branches) + git commit/push
+  flue.ts             # Creates a Flue agent session with logging
+  flue-logging.ts     # Streams agent events to the Actions log, redacting tokens
+  pr.ts               # PR title/body generation (project skill or built-in prompt)
+  handlers/
+    triage.ts         # reproduce -> diagnose -> verify -> fix pipeline, push, preview, labels
+    retriage.ts       # LLM decides whether a new comment warrants re-running triage
+    verify-fix.ts     # LLM classifies reporter feedback; opens PR on confirmation
+    cleanup.ts        # Deletes the fix branch when the issue closes
+    comment.ts        # Turns the triage report into the issue comment
+test/                 # Unit tests (node:test)
+test/integration/     # Handler tests with mocked fetch/LLM, and a run of the built bundle
+test/evals/           # Live-LLM evals for retriage and fix-verification prompts
+dist/index.mjs        # esbuild bundle that action.yml runs (commit it after every src change)
+.agents/skills/triage # This repo's own triage skills (used by .github/workflows/triage.yml)
+examples/skills/triage# Starter skill templates with <!-- CUSTOMIZE --> markers
+```
+
 ## Development
 
 ```bash
 pnpm install
-pnpm test          # Unit tests (router, labels)
+pnpm test:unit     # Unit tests only (router, labels, input, git commit, logging)
+pnpm test          # Build, syntax-check dist/, then unit + integration tests
 pnpm test:evals    # LLM eval tests (requires ANTHROPIC_API_KEY)
-pnpm build         # Bundle to dist/
+pnpm build         # Bundle src/ to dist/index.mjs with esbuild
 pnpm lint          # Biome check
 pnpm format        # Biome format
 ```
+
+`action.yml` runs `dist/index.mjs` directly, so rebuild and commit `dist/` whenever `src/` changes.
